@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 20% 4%;
+    --foreground: 0 5% 90%;
+    --card: 0 20% 7%;
+    --card-foreground: 0 5% 90%;
+    --popover: 0 20% 7%;
+    --popover-foreground: 0 5% 90%;
+    --primary: 0 70% 57%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 15% 12%;
+    --secondary-foreground: 0 5% 90%;
+    --muted: 0 15% 12%;
+    --muted-foreground: 0 5% 55%;
+    --accent: 0 15% 14%;
+    --accent-foreground: 0 5% 90%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 15% 15%;
+    --input: 0 15% 15%;
+    --ring: 0 70% 57%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-pochven-bg text-gray-100;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-pochven-bg;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-pochven-border rounded-full;
+  }
+}
+
+@keyframes gradient-drift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes icon-color-drift {
+  0%, 100% { color: #9ca3af; }
+  30% { color: #ef4444; }
+  50% { color: #d4d4d8; }
+  80% { color: #ef4444; }
+}
+
+.gradient-drift-icon {
+  animation: icon-color-drift 6s ease-in-out infinite;
+}
+
+.gradient-drift-text {
+  background: linear-gradient(
+    270deg,
+    #d4d4d8 0%,
+    #ef4444 25%,
+    #9ca3af 50%,
+    #ef4444 75%,
+    #d4d4d8 100%
+  );
+  background-size: 300% 100%;
+  animation: gradient-drift 8s ease-in-out infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+

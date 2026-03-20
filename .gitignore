@@ -1,0 +1,46 @@
+# compiled output
+dist/
+node_modules/
+build/
+
+# turbo
+.turbo/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+coverage/
+.nyc_output/
+
+# IDEs
+.idea/
+.project
+.classpath
+*.launch
+.settings/
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Environment
+.env
+.env.*.local
+
+# Temp
+.temp
+.tmp
+
+# Runtime
+pids
+*.pid
+*.seed
+*.pid.lock

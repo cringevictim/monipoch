@@ -1,0 +1,63 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: monipoch-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-monipoch}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+
+  redis:
+    image: redis:7-alpine
+    container_name: monipoch-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: monipoch-api
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - redis
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-monipoch}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      EVE_CLIENT_ID: ${EVE_CLIENT_ID}
+      EVE_CLIENT_SECRET: ${EVE_CLIENT_SECRET}
+      EVE_CALLBACK_URL: ${EVE_CALLBACK_URL}
+      ALLOWED_ALLIANCE_ID: ${ALLOWED_ALLIANCE_ID}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      FRONTEND_URL: ${FRONTEND_URL}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: monipoch-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${PUBLIC_PORT:-80}:80"
+
+volumes:
+  mysql_data:
+  redis_data:
