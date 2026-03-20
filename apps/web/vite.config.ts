@@ -32,6 +32,10 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      '/auth/debug-login': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
       '/auth/callback': {
         target: 'http://localhost:3000',
         changeOrigin: true,

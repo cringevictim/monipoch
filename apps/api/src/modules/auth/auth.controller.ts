@@ -1,10 +1,12 @@
-import { Controller, Get, Query, Res, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Query, Res, Req, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
 import { randomBytes } from 'crypto';
+import type { SessionUser } from '@monipoch/shared';
 
 @Public()
 @Controller('auth')
@@ -12,13 +14,17 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private config: ConfigService,
+    private jwtService: JwtService,
   ) {}
 
   @Get('login')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   login(@Req() req: Request, @Res() res: Response) {
+    if (this.config.get<boolean>('debug')) {
+      return res.redirect('/auth/debug-login');
+    }
+
     const state = randomBytes(16).toString('hex');
-    (req as any).session = (req as any).session ?? {};
     res.cookie('oauth_state', state, {
       httpOnly: true,
       secure: this.config.get<string>('nodeEnv') === 'production',
@@ -27,6 +33,34 @@ export class AuthController {
     });
     const url = this.authService.getLoginUrl(state);
     return res.redirect(url);
+  }
+
+  @Get('debug-login')
+  async debugLogin(@Res() res: Response) {
+    if (!this.config.get<boolean>('debug')) {
+      throw new NotFoundException();
+    }
+
+    const payload: SessionUser = {
+      userId: 0,
+      character: {
+        characterId: 96491572,
+        characterName: 'Debug Pilot',
+        corporationId: 98000001,
+        corporationName: 'Debug Corp',
+        allianceId: this.config.get<number>('eve.allowedAllianceId') ?? 0,
+        allianceName: 'Debug Alliance',
+        portraitUrl: 'https://images.evetech.net/characters/96491572/portrait?size=128',
+      },
+      scopes: [],
+    };
+
+    const token = this.jwtService.sign(payload);
+    const frontendUrl = this.config.get<string>('frontendUrl') || 'http://localhost:5173';
+
+    return res.redirect(
+      `${frontendUrl}/auth/success?token=${encodeURIComponent(token)}&name=${encodeURIComponent(payload.character.characterName)}`,
+    );
   }
 
   @Get('callback')

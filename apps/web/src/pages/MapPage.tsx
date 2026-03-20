@@ -378,6 +378,9 @@ export default function MapPage() {
               )}
             </AnimatePresence>
           </main>
+          <div className="fixed bottom-2 right-3 z-20 text-[11px] text-gray-500/60 select-none pointer-events-auto">
+            made by Gusb · ISK tips always appreciated
+          </div>
         </div>
       </div>
     </TooltipProvider>
