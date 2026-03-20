@@ -260,12 +260,14 @@ export class KillmailService {
   }
 
   async getHeatmapData(): Promise<
-    Record<number, { kills1h: number; kills6h: number; kills24h: number }>
+    Record<number, { kills1h: number; kills6h: number; kills24h: number; kills3d: number; kills7d: number }>
   > {
     const now = Date.now();
     const h1 = new Date(now - 1 * 60 * 60 * 1000);
     const h6 = new Date(now - 6 * 60 * 60 * 1000);
     const h24 = new Date(now - 24 * 60 * 60 * 1000);
+    const d3 = new Date(now - 3 * 24 * 60 * 60 * 1000);
+    const d7 = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
     const rows = await this.db('killmails')
       .select('solar_system_id')
@@ -278,15 +280,23 @@ export class KillmailService {
       .select(
         this.db.raw('SUM(CASE WHEN killmail_time >= ? THEN 1 ELSE 0 END) as kills24h', [h24]),
       )
-      .where('killmail_time', '>=', h24)
+      .select(
+        this.db.raw('SUM(CASE WHEN killmail_time >= ? THEN 1 ELSE 0 END) as kills3d', [d3]),
+      )
+      .select(
+        this.db.raw('SUM(CASE WHEN killmail_time >= ? THEN 1 ELSE 0 END) as kills7d', [d7]),
+      )
+      .where('killmail_time', '>=', d7)
       .groupBy('solar_system_id');
 
-    const result: Record<number, { kills1h: number; kills6h: number; kills24h: number }> = {};
+    const result: Record<number, { kills1h: number; kills6h: number; kills24h: number; kills3d: number; kills7d: number }> = {};
     for (const row of rows) {
       result[row.solar_system_id] = {
         kills1h: Number(row.kills1h),
         kills6h: Number(row.kills6h),
         kills24h: Number(row.kills24h),
+        kills3d: Number(row.kills3d),
+        kills7d: Number(row.kills7d),
       };
     }
     return result;

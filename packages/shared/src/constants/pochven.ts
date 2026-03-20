@@ -6,12 +6,12 @@ export enum Constellation {
   KRAI_VELES = 'krai_veles',
 }
 
-export type SystemType = 'home' | 'border' | 'internal';
+export type SystemType = 'home' | 'border' | 'internal' | 'external';
 
 export interface PochvenSystem {
   systemId: number;
   name: string;
-  constellation: Constellation;
+  constellation?: Constellation;
   securityClass: string;
   systemType: SystemType;
 }
@@ -61,6 +61,25 @@ export const POCHVEN_SYSTEM_BY_ID = new Map(
 export const POCHVEN_SYSTEM_BY_NAME = new Map(
   POCHVEN_SYSTEMS.map((s) => [s.name.toLowerCase(), s]),
 );
+
+export const TABBETZUR: PochvenSystem = {
+  systemId: 30003465,
+  name: 'Tabbetzur',
+  securityClass: 'L',
+  systemType: 'external',
+};
+
+export const EXTRA_TRACKED_SYSTEMS: PochvenSystem[] = [TABBETZUR];
+
+export const ALL_TRACKED_SYSTEM_IDS = new Set([
+  ...POCHVEN_SYSTEM_IDS,
+  ...EXTRA_TRACKED_SYSTEMS.map((s) => s.systemId),
+]);
+
+export const ALL_TRACKED_SYSTEM_BY_ID = new Map<number, PochvenSystem>([
+  ...POCHVEN_SYSTEM_BY_ID,
+  ...EXTRA_TRACKED_SYSTEMS.map((s) => [s.systemId, s] as const),
+]);
 
 /**
  * All stargate connections verified via ESI stargates endpoint 2026-03-19.

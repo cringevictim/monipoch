@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nest
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Knex } from 'knex';
 import { KNEX_TOKEN } from '../../database/knex.provider';
-import { POCHVEN_REGION_ID, POCHVEN_SYSTEM_IDS } from '@monipoch/shared';
+import { POCHVEN_REGION_ID, ALL_TRACKED_SYSTEM_IDS, EXTRA_TRACKED_SYSTEMS } from '@monipoch/shared';
 import { ZKBApi, ESIClient, ESIEndpoints } from '@monipoch/eve-sdk';
 import { KillmailService } from '../killmail/killmail.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -113,7 +113,7 @@ export class BackfillService implements OnModuleInit, OnModuleDestroy {
               kill.zkb.hash,
             );
 
-            if (!POCHVEN_SYSTEM_IDS.has(detail.solar_system_id)) {
+            if (!ALL_TRACKED_SYSTEM_IDS.has(detail.solar_system_id)) {
               totalSkipped++;
               continue;
             }
@@ -145,6 +145,78 @@ export class BackfillService implements OnModuleInit, OnModuleDestroy {
               this.logger.warn(`Failed to process killmail ${kill.killmail_id}: ${err.message}`);
             }
           }
+        }
+      }
+
+      for (const extSys of EXTRA_TRACKED_SYSTEMS) {
+        this.logger.log(`Backfilling external system: ${extSys.name} (${extSys.systemId})`);
+        let extConsecutiveExisting = 0;
+
+        for (let page = 1; page <= MAX_PAGES; page++) {
+          await this.sleep(ZKB_PAGE_DELAY_MS);
+
+          let kills;
+          try {
+            kills = await this.zkb.getKillsBySystem(extSys.systemId, page);
+          } catch (err: any) {
+            if (err.message?.includes('429') || err.message?.includes('420')) {
+              this.logger.warn('zKB rate limit (external), waiting 60s...');
+              await this.sleep(60_000);
+              page--;
+              continue;
+            }
+            this.logger.warn(`Failed to fetch external kills for ${extSys.name}: ${err.message}`);
+            break;
+          }
+
+          if (!kills || kills.length === 0) {
+            this.logger.log(`No more kills for ${extSys.name}, done`);
+            break;
+          }
+
+          for (const kill of kills) {
+            const exists = await this.killmailService.exists(kill.killmail_id);
+            if (exists) {
+              totalSkipped++;
+              extConsecutiveExisting++;
+              if (extConsecutiveExisting >= MAX_CONSECUTIVE_EXISTING && totalInserted > 0) {
+                this.logger.log(`Caught up for ${extSys.name} after ${MAX_CONSECUTIVE_EXISTING} consecutive existing`);
+                break;
+              }
+              continue;
+            }
+
+            extConsecutiveExisting = 0;
+
+            try {
+              await this.sleep(ESI_CALL_DELAY_MS);
+              const { data: detail } = await this.esi.getKillmailDetail(
+                kill.killmail_id,
+                kill.zkb.hash,
+              );
+
+              await this.killmailService.insert(
+                {
+                  killmail_id: detail.killmail_id,
+                  killmail_time: detail.killmail_time,
+                  solar_system_id: detail.solar_system_id,
+                  victim: detail.victim,
+                  attackers: detail.attackers,
+                },
+                kill.zkb,
+              );
+              totalInserted++;
+            } catch (err: any) {
+              if (err.message?.includes('429') || err.message?.includes('420')) {
+                this.logger.warn('ESI rate limit (external), waiting 30s...');
+                await this.sleep(30_000);
+                break;
+              }
+              this.logger.warn(`Failed to process external killmail ${kill.killmail_id}: ${err.message}`);
+            }
+          }
+
+          if (extConsecutiveExisting >= MAX_CONSECUTIVE_EXISTING && totalInserted > 0) break;
         }
       }
 

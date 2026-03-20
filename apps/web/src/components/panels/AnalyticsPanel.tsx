@@ -1,5 +1,14 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from 'recharts';
 import { cn } from '@/lib/utils';
 import { apiJson } from '@/lib/api';
 import { timeAgo } from '@/lib/time';
@@ -83,8 +92,8 @@ function eveShipRender(id: number, size = 64) {
 
 const TIME_PERIODS = [
   { label: '24H', days: 1 },
+  { label: '3D', days: 3 },
   { label: '7D', days: 7 },
-  { label: '30D', days: 30 },
 ] as const;
 
 const DEFAULT_LIMIT = 20;
@@ -498,6 +507,16 @@ export default function AnalyticsPanel() {
     staleTime: 30_000,
   });
 
+  const hourlyDays = days <= 1 ? 1 : days <= 3 ? 3 : 7;
+  const { data: hourlyActivity = [] } = useQuery<{ hour: number; kills: number; isk: number }[]>({
+    queryKey: ['analytics', 'hourly-activity', hourlyDays, scopeKey],
+    queryFn: () =>
+      apiJson<{ hour: number; kills: number; isk: number }[]>(
+        `/api/analytics/hourly-activity?days=${hourlyDays}${allianceFilter}`,
+      ),
+    staleTime: 30_000,
+  });
+
   const overviewStats = useMemo(() => {
     const totalKills = killStats.reduce((sum, s) => sum + s.kills, 0);
     const totalIsk = killStats.reduce((sum, s) => sum + s.iskDestroyed, 0);
@@ -520,6 +539,12 @@ export default function AnalyticsPanel() {
                 className="flex-1 data-[state=active]:bg-pochven-accent/20 data-[state=active]:text-pochven-accent"
               >
                 Overview
+              </TabsTrigger>
+              <TabsTrigger
+                value="activity"
+                className="flex-1 data-[state=active]:bg-pochven-accent/20 data-[state=active]:text-pochven-accent"
+              >
+                Activity
               </TabsTrigger>
               <TabsTrigger
                 value="pilots"
@@ -689,6 +714,134 @@ export default function AnalyticsPanel() {
                   </div>
                 )}
               </div>
+            </div>
+          </ScrollArea>
+        </TabsContent>
+
+        {/* Activity Tab */}
+        <TabsContent
+          value="activity"
+          className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
+        >
+          <ScrollArea className="h-full">
+            <div className="space-y-4 px-4 py-3">
+              {killStatsLoading ? (
+                <div className="text-sm text-gray-500 py-6 text-center">Loading...</div>
+              ) : killStats.length === 0 ? (
+                <div className="text-sm text-gray-500 py-6 text-center">No data</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg border border-pochven-border bg-pochven-bg/50 p-3">
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">
+                        Avg Kills / Day
+                      </div>
+                      <div className="text-2xl font-bold text-gray-100">
+                        {(killStats.reduce((s, d) => s + d.kills, 0) / (killStats.length || 1)).toFixed(1)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-pochven-border bg-pochven-bg/50 p-3">
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1">
+                        Avg ISK / Day
+                      </div>
+                      <div className="text-2xl font-bold text-gray-100">
+                        {formatISK(killStats.reduce((s, d) => s + d.iskDestroyed, 0) / (killStats.length || 1))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-pochven-border bg-pochven-bg/50 p-3">
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-3">
+                      {hourlyDays === 1 ? 'Kills — Last 24 Hours' : `Avg Kills / Hour — ${hourlyDays}D`}
+                    </div>
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={hourlyActivity} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                          <XAxis
+                            dataKey="hour"
+                            tick={{ fill: '#9ca3af', fontSize: 9 }}
+                            tickFormatter={(v) => `${Number(v)}:00`}
+                            stroke="#ffffff10"
+                            interval={2}
+                          />
+                          <YAxis
+                            tick={{ fill: '#9ca3af', fontSize: 10 }}
+                            stroke="#ffffff10"
+                            allowDecimals={hourlyDays > 1}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: '#1a1010',
+                              border: '1px solid #ffffff15',
+                              borderRadius: 8,
+                              fontSize: 12,
+                            }}
+                            labelFormatter={(v) => `${Number(v)}:00 – ${Number(v) + 1}:00 EVE`}
+                            formatter={(v) => {
+                              const n = Number(v);
+                              return [
+                                hourlyDays > 1 ? n.toFixed(1) : n,
+                                hourlyDays > 1 ? 'Avg Kills' : 'Kills',
+                              ];
+                            }}
+                          />
+                          <Bar
+                            dataKey="kills"
+                            fill="#ef4444"
+                            fillOpacity={0.7}
+                            radius={[2, 2, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-pochven-border bg-pochven-bg/50 p-3">
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-3">
+                      {hourlyDays === 1 ? 'ISK Destroyed — Last 24 Hours' : `Avg ISK Destroyed / Hour — ${hourlyDays}D`}
+                    </div>
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={hourlyActivity} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                          <XAxis
+                            dataKey="hour"
+                            tick={{ fill: '#9ca3af', fontSize: 9 }}
+                            tickFormatter={(v) => `${Number(v)}:00`}
+                            stroke="#ffffff10"
+                            interval={2}
+                          />
+                          <YAxis
+                            tick={{ fill: '#9ca3af', fontSize: 10 }}
+                            stroke="#ffffff10"
+                            tickFormatter={(v) => formatISK(Number(v))}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: '#1a1010',
+                              border: '1px solid #ffffff15',
+                              borderRadius: 8,
+                              fontSize: 12,
+                            }}
+                            labelFormatter={(v) => `${Number(v)}:00 – ${Number(v) + 1}:00 EVE`}
+                            formatter={(v) => [
+                              formatISK(Number(v)),
+                              hourlyDays > 1 ? 'Avg ISK' : 'ISK Destroyed',
+                            ]}
+                          />
+                          <Bar
+                            dataKey="isk"
+                            fill="#f59e0b"
+                            fillOpacity={0.7}
+                            radius={[2, 2, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </ScrollArea>
         </TabsContent>

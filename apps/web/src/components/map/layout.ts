@@ -1,5 +1,5 @@
 import type { PochvenSystem } from '@monipoch/shared';
-import { TRIANGLE_LAYOUT } from '@monipoch/shared';
+import { TRIANGLE_LAYOUT, TABBETZUR } from '@monipoch/shared';
 
 export const V = {
   top: { x: 500, y: 120 },
@@ -37,6 +37,10 @@ export function computeLayout(_systems: PochvenSystem[]) {
   placeEdgeSystems(V.top, V.bottomLeft, leftEdge.upperHalf, leftEdge.lowerHalf, positions);
   placeEdgeSystems(V.top, V.bottomRight, rightEdge.upperHalf, rightEdge.lowerHalf, positions);
   placeEdgeSystems(V.bottomLeft, V.bottomRight, bottomEdge.upperHalf, bottomEdge.lowerHalf, positions);
+
+  const cx = (V.top.x + V.bottomLeft.x + V.bottomRight.x) / 3;
+  const cy = (V.top.y + V.bottomLeft.y + V.bottomRight.y) / 3;
+  positions.set(TABBETZUR.name, { x: cx, y: cy });
 
   return positions;
 }

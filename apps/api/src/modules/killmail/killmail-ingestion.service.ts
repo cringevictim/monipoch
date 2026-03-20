@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { KillmailStream } from '@monipoch/eve-sdk';
-import { POCHVEN_SYSTEM_IDS, POCHVEN_SYSTEM_BY_ID, type RedisQKillmail } from '@monipoch/shared';
+import { ALL_TRACKED_SYSTEM_IDS, ALL_TRACKED_SYSTEM_BY_ID, type RedisQKillmail } from '@monipoch/shared';
 import { KillmailService } from './killmail.service';
 
 @Injectable()
@@ -50,9 +50,9 @@ export class KillmailIngestionService implements OnModuleInit, OnModuleDestroy {
   private async handleKillmail(km: RedisQKillmail): Promise<void> {
     const systemId = km.killmail.solar_system_id;
 
-    if (!POCHVEN_SYSTEM_IDS.has(systemId)) return;
+    if (!ALL_TRACKED_SYSTEM_IDS.has(systemId)) return;
 
-    const system = POCHVEN_SYSTEM_BY_ID.get(systemId);
+    const system = ALL_TRACKED_SYSTEM_BY_ID.get(systemId);
     this.logger.log(
       `Pochven kill: ${km.killID} in ${system?.name ?? systemId} (${Math.round(km.zkb.totalValue / 1_000_000)}M ISK)`,
     );

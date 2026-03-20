@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   POCHVEN_SYSTEMS,
   POCHVEN_CONNECTIONS,
+  EXTRA_TRACKED_SYSTEMS,
   type PochvenSystem,
 } from '@monipoch/shared';
 import { KillmailService } from '../killmail/killmail.service';
@@ -19,7 +20,7 @@ export class MapService {
     connections: [string, string][];
   } {
     return {
-      systems: POCHVEN_SYSTEMS,
+      systems: [...POCHVEN_SYSTEMS, ...EXTRA_TRACKED_SYSTEMS],
       connections: POCHVEN_CONNECTIONS,
     };
   }

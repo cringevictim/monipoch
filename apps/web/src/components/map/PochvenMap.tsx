@@ -14,7 +14,7 @@ import { useCollisionEngine, type LabelDescriptor, type StaticObstacle } from '.
 interface Props {
   systems: PochvenSystem[];
   connections: [string, string][];
-  heatmap: Record<number, { kills1h: number; kills6h: number; kills24h: number }>;
+  heatmap: Record<number, { kills1h: number; kills6h: number; kills24h: number; kills3d: number; kills7d: number }>;
   activeFights: DetectedFight[];
   activeCamps: GateCampData[];
   activeRoams: RoamingFleetData[];
@@ -49,7 +49,7 @@ const CHAR_W_ROAM = 3.4;
 const LABEL_PAD = 10;
 
 function getNodeRadius(kills: number, systemType: string): number {
-  const base = systemType === 'home' ? 14 : systemType === 'border' ? 13 : 11;
+  const base = systemType === 'home' ? 14 : systemType === 'external' ? 12 : systemType === 'border' ? 13 : 11;
   if (kills === 0) return base;
   if (kills <= 5) return base + 2;
   if (kills <= 15) return base + 4;
@@ -206,7 +206,8 @@ const PochvenMap = forwardRef<SVGSVGElement, Props>(function PochvenMap(
       case '1h': return data.kills1h;
       case '6h': return data.kills6h;
       case '24h': return data.kills24h;
-      case '7d': return data.kills24h * 7;
+      case '3d': return data.kills3d;
+      case '7d': return data.kills7d;
     }
   }
 

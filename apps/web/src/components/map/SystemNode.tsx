@@ -26,8 +26,10 @@ function getHeatColor(kills: number): string {
   return '#ff0040';
 }
 
+const EXTERNAL_COLOR = '#8899aa';
+
 function getNodeRadius(kills: number, systemType: string): number {
-  const base = systemType === 'home' ? 14 : systemType === 'border' ? 13 : 11;
+  const base = systemType === 'home' ? 14 : systemType === 'external' ? 12 : systemType === 'border' ? 13 : 11;
   if (kills === 0) return base;
   if (kills <= 5) return base + 2;
   if (kills <= 15) return base + 4;
@@ -42,9 +44,12 @@ export default function SystemNode({ system, x, y, kills, hasFight }: Props) {
 
   const heatColor = getHeatColor(kills);
   const radius = getNodeRadius(kills, system.systemType);
-  const constellationColor = CONSTELLATION_COLORS[system.constellation];
+  const constellationColor = system.constellation
+    ? CONSTELLATION_COLORS[system.constellation]
+    : EXTERNAL_COLOR;
   const isHome = system.systemType === 'home';
   const isBorder = system.systemType === 'border';
+  const isExternal = system.systemType === 'external';
 
   const effectiveHover = isHovered && !isSelected;
 
@@ -152,7 +157,6 @@ export default function SystemNode({ system, x, y, kills, hasFight }: Props) {
         {system.name}
       </motion.text>
 
-      {/* System type label for home systems */}
       {isHome && (
         <motion.text
           x={x}
@@ -165,6 +169,21 @@ export default function SystemNode({ system, x, y, kills, hasFight }: Props) {
           animate={{ opacity: 1 }}
         >
           HOME
+        </motion.text>
+      )}
+
+      {isExternal && (
+        <motion.text
+          x={x}
+          y={y + radius + 23}
+          textAnchor="middle"
+          className="text-[7px] pointer-events-none select-none"
+          fill={constellationColor}
+          fillOpacity={0.4}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          EXTERNAL
         </motion.text>
       )}
     </g>

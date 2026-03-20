@@ -36,13 +36,16 @@ export default function RoamIndicator({ x, y, labelBaseX, labelBaseY, roam, coll
   const tacticalId = `roam-${roam.id}`;
   const isActive = selectedId === tacticalId;
 
-  const baseRadius = 22;
+  const baseRadius = 16;
 
   const gRef = useRef<SVGGElement>(null);
   const lineRef = useRef<SVGLineElement>(null);
   const gradRef = useRef<SVGLinearGradientElement>(null);
+  const outlineGradRef = useRef<SVGLinearGradientElement>(null);
   const rafRef = useRef(0);
   const phaseRef = useRef(Math.random() * Math.PI * 2);
+  const gradPhase1Ref = useRef(Math.random() * Math.PI * 2);
+  const gradPhase2Ref = useRef(Math.random() * Math.PI * 2);
 
   const cxOff = collisionOffset?.dx ?? 0;
   const cyOff = collisionOffset?.dy ?? 0;
@@ -65,6 +68,17 @@ export default function RoamIndicator({ x, y, labelBaseX, labelBaseY, roam, coll
         gradRef.current.setAttribute('x2', String(lx));
         gradRef.current.setAttribute('y2', String(ly));
       }
+
+      const gradAngle =
+        Math.sin(t * 32 + gradPhase1Ref.current) * Math.PI +
+        Math.cos(t * 20 + gradPhase2Ref.current) * Math.PI * 0.5;
+      if (outlineGradRef.current) {
+        outlineGradRef.current.setAttribute('x1', `${50 + Math.cos(gradAngle) * 50}%`);
+        outlineGradRef.current.setAttribute('y1', `${50 + Math.sin(gradAngle) * 50}%`);
+        outlineGradRef.current.setAttribute('x2', `${50 - Math.cos(gradAngle) * 50}%`);
+        outlineGradRef.current.setAttribute('y2', `${50 - Math.sin(gradAngle) * 50}%`);
+      }
+
       rafRef.current = requestAnimationFrame(tick);
     }
     rafRef.current = requestAnimationFrame(tick);
@@ -78,6 +92,7 @@ export default function RoamIndicator({ x, y, labelBaseX, labelBaseY, roam, coll
 
   const textGradId = `roam-text-grad-${roam.id}`;
   const lineGradId = `roam-line-${roam.id}`;
+  const outlineGradId = `roam-outline-grad-${roam.id}`;
 
   const handleClick = useCallback(() => {
     selectTactical(isActive ? null : tacticalId);
@@ -95,6 +110,10 @@ export default function RoamIndicator({ x, y, labelBaseX, labelBaseY, roam, coll
           <stop offset="50%" stopColor={COLOR} />
           <stop offset="100%" stopColor={COLOR_END} />
         </linearGradient>
+        <linearGradient ref={outlineGradRef} id={outlineGradId} x1="100%" y1="50%" x2="0%" y2="50%">
+          <stop offset="0%" stopColor="#d4d4d8" stopOpacity={0.55} />
+          <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.25} />
+        </linearGradient>
       </defs>
 
       <circle
@@ -103,17 +122,33 @@ export default function RoamIndicator({ x, y, labelBaseX, labelBaseY, roam, coll
         r={baseRadius}
         fill="transparent"
         stroke={COLOR}
-        strokeWidth={1.2}
-        strokeDasharray="6 3"
-        strokeOpacity={0.3}
+        strokeWidth={1}
+        strokeDasharray="3 4"
+        strokeOpacity={0.55}
       >
-        <animate attributeName="r" values={`${baseRadius};${baseRadius + 4};${baseRadius}`} dur="3.5s" repeatCount="indefinite" />
-        <animate attributeName="stroke-opacity" values="0.3;0.6;0.3" dur="3.5s" repeatCount="indefinite" />
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from={`0 ${x} ${y}`}
+          to={`360 ${x} ${y}`}
+          dur="8s"
+          repeatCount="indefinite"
+        />
       </circle>
 
       <line ref={lineRef} x1={x} y1={y} x2={labelBaseX} y2={labelBaseY} stroke={`url(#${lineGradId})`} strokeWidth={1} />
 
       <g ref={gRef}>
+        <rect
+          x={-rectW / 2 - 0.5}
+          y={-LABEL_H / 2 - 0.5}
+          width={rectW + 1}
+          height={LABEL_H + 1}
+          rx={4.5}
+          fill="none"
+          stroke={`url(#${outlineGradId})`}
+          strokeWidth={1.5}
+        />
         <rect
           x={-rectW / 2}
           y={-LABEL_H / 2}

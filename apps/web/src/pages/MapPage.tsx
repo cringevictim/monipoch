@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PochvenSystem, DetectedFight, WsKillEvent } from '@monipoch/shared';
-import { POCHVEN_SYSTEMS } from '@monipoch/shared';
+import { POCHVEN_SYSTEMS, EXTRA_TRACKED_SYSTEMS } from '@monipoch/shared';
 import { apiJson } from '../lib/api';
 import {
   Bell,
@@ -28,11 +28,13 @@ import type { RoamingFleetData } from '../components/map/RoamIndicator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import NotificationPanel from '../components/panels/NotificationPanel';
 import AnalyticsPanel from '../components/panels/AnalyticsPanel';
+import DebugPanel from '../components/panels/DebugPanel';
 
 const TIME_WINDOWS: { label: string; value: TimeWindow }[] = [
   { label: '1H', value: '1h' },
   { label: '6H', value: '6h' },
   { label: '24H', value: '24h' },
+  { label: '3D', value: '3d' },
   { label: '7D', value: '7d' },
 ];
 
@@ -59,6 +61,7 @@ export default function MapPage() {
   useEffect(() => { loadSoundPrefs(); }, [loadSoundPrefs]);
   const queryClient = useQueryClient();
   const lastEvent = useWsStore((s) => s.lastEvent);
+  const processedKillIds = useRef(new Set<number>());
 
   useEffect(() => {
     if (!lastEvent) return;
@@ -68,17 +71,27 @@ export default function MapPage() {
     }
 
     if (lastEvent.type === 'kill.new') {
+      const killId = (lastEvent as WsKillEvent).killmail.killmail_id;
+      if (processedKillIds.current.has(killId)) return;
+      processedKillIds.current.add(killId);
+      if (processedKillIds.current.size > 200) {
+        const ids = [...processedKillIds.current];
+        for (let i = 0; i < ids.length - 100; i++) processedKillIds.current.delete(ids[i]);
+      }
+
       const systemId = (lastEvent as WsKillEvent).killmail.solar_system_id;
-      type HeatmapData = Record<number, { kills1h: number; kills6h: number; kills24h: number }>;
+      type HeatmapData = Record<number, { kills1h: number; kills6h: number; kills24h: number; kills3d: number; kills7d: number }>;
       queryClient.setQueryData<HeatmapData>(['heatmap'], (old) => {
         if (!old) return old;
-        const prev = old[systemId] ?? { kills1h: 0, kills6h: 0, kills24h: 0 };
+        const prev = old[systemId] ?? { kills1h: 0, kills6h: 0, kills24h: 0, kills3d: 0, kills7d: 0 };
         return {
           ...old,
           [systemId]: {
             kills1h: prev.kills1h + 1,
             kills6h: prev.kills6h + 1,
             kills24h: prev.kills24h + 1,
+            kills3d: prev.kills3d + 1,
+            kills7d: prev.kills7d + 1,
           },
         };
       });
@@ -94,11 +107,12 @@ export default function MapPage() {
   const svgRef = useRef<SVGSVGElement>(null);
   const [svgRect, setSvgRect] = useState<DOMRect | null>(null);
 
-  const positions = useMemo(() => computeLayout(POCHVEN_SYSTEMS), []);
+  const allSystems = useMemo(() => [...POCHVEN_SYSTEMS, ...EXTRA_TRACKED_SYSTEMS], []);
+  const positions = useMemo(() => computeLayout(allSystems), [allSystems]);
 
   const selectedSystem = useMemo(
-    () => (selectedSystemId ? POCHVEN_SYSTEMS.find((s) => s.systemId === selectedSystemId) ?? null : null),
-    [selectedSystemId],
+    () => (selectedSystemId ? allSystems.find((s) => s.systemId === selectedSystemId) ?? null : null),
+    [selectedSystemId, allSystems],
   );
 
   const selectedPos = useMemo(() => {
@@ -140,7 +154,7 @@ export default function MapPage() {
   const { data: heatmap } = useQuery({
     queryKey: ['heatmap'],
     queryFn: () =>
-      apiJson<Record<number, { kills1h: number; kills6h: number; kills24h: number }>>(
+      apiJson<Record<number, { kills1h: number; kills6h: number; kills24h: number; kills3d: number; kills7d: number }>>(
         '/api/map/heatmap',
       ),
     refetchInterval: 60_000,
@@ -174,7 +188,7 @@ export default function MapPage() {
     if (isCamp) {
       const camp = activeCamps.find((c) => String(c.id) === rawId);
       if (!camp) return null;
-      const sys = POCHVEN_SYSTEMS.find((s) => s.systemId === camp.currentSystemId);
+      const sys = allSystems.find((s) => s.systemId === camp.currentSystemId);
       if (!sys) return null;
       return positions.get(sys.name) ?? null;
     } else {
@@ -182,7 +196,7 @@ export default function MapPage() {
       if (!roam) return null;
       const hist = roam.systemHistory ?? [];
       if (hist.length === 0) return null;
-      const sys = POCHVEN_SYSTEMS.find((s) => s.systemId === hist[hist.length - 1].systemId);
+      const sys = allSystems.find((s) => s.systemId === hist[hist.length - 1].systemId);
       if (!sys) return null;
       return positions.get(sys.name) ?? null;
     }
@@ -195,7 +209,8 @@ export default function MapPage() {
       case '1h': return data.kills1h;
       case '6h': return data.kills6h;
       case '24h': return data.kills24h;
-      case '7d': return data.kills24h * 7;
+      case '3d': return data.kills3d;
+      case '7d': return data.kills7d;
     }
   }
 
@@ -212,19 +227,35 @@ export default function MapPage() {
             </h1>
 
             <div className="flex gap-1.5">
-              {TIME_WINDOWS.map((tw) => (
-                <button
-                  key={tw.value}
-                  onClick={() => setTimeWindow(tw.value)}
-                  className={`px-2.5 py-1 text-sm rounded transition-all duration-150 ${
-                    timeWindow === tw.value
-                      ? 'bg-pochven-accent/20 text-pochven-accent border border-pochven-accent/30'
-                      : 'text-gray-500 hover:text-gray-300 border border-transparent'
-                  }`}
-                >
-                  {tw.label}
-                </button>
-              ))}
+              {TIME_WINDOWS.map((tw) => {
+                const isActive = timeWindow === tw.value;
+                const numPart = tw.label.replace(/[A-Z]/g, '');
+                const letterPart = tw.label.replace(/[0-9]/g, '');
+
+                if (isActive) {
+                  return (
+                    <div key={tw.value} className="gradient-border-btn">
+                      <button
+                        onClick={() => setTimeWindow(tw.value)}
+                        className="px-2.5 py-1 text-sm rounded bg-pochven-bg/90 block"
+                      >
+                        <span className="text-pochven-accent">{numPart}</span>
+                        <span className="text-gray-400">{letterPart}</span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <button
+                    key={tw.value}
+                    onClick={() => setTimeWindow(tw.value)}
+                    className="px-2.5 py-1 text-sm rounded transition-all duration-150 text-gray-500 hover:text-gray-300 border border-transparent"
+                  >
+                    {tw.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -381,6 +412,7 @@ export default function MapPage() {
           <div className="fixed bottom-2 right-3 z-20 text-[11px] text-gray-500/60 select-none pointer-events-auto">
             made by Gusb · ISK tips always appreciated
           </div>
+          {import.meta.env.DEV && <DebugPanel />}
         </div>
       </div>
     </TooltipProvider>

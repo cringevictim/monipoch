@@ -208,7 +208,9 @@ export default function SystemPopup({ system, x, y, kills, svgRect }: Props) {
   const popupEdgeX = onRight ? left : left + popupW;
   const popupEdgeY = Math.min(Math.max(sysScreenY, top + 20), top + popupH - 20);
 
-  const accentColor = CONSTELLATION_COLORS[system.constellation];
+  const accentColor = system.constellation
+    ? CONSTELLATION_COLORS[system.constellation]
+    : '#8899aa';
   const totalIsk = recentKills?.reduce((sum, k) => sum + Number(k.total_value), 0) ?? 0;
 
   const lineId = `connector-${system.systemId}`;
@@ -293,7 +295,7 @@ export default function SystemPopup({ system, x, y, kills, svgRect }: Props) {
           <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: accentColor }} />
           <span className="text-sm font-bold text-gray-100 truncate">{system.name}</span>
           <span className="text-[12px] text-gray-500 flex-shrink-0">
-            {CONSTELLATION_LABELS[system.constellation]} &middot; {system.securityClass}
+            {system.constellation ? CONSTELLATION_LABELS[system.constellation] : 'External'} &middot; {system.securityClass}
           </span>
           {system.systemType === 'home' && (
             <span className="text-[9px] px-1 py-px rounded bg-white/10 text-gray-400 uppercase tracking-wider font-medium flex-shrink-0">

@@ -64,8 +64,6 @@ export function playSoundForEvent(eventType: string) {
       break;
     case 'fight.started':
     case 'fight.updated':
-    case 'fight.ended':
-    case 'fight.update':
       playFightSound();
       break;
     case 'camp.detected':

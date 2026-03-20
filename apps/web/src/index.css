@@ -79,3 +79,24 @@
   background-clip: text;
 }
 
+@keyframes border-gradient-drift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-border-btn {
+  position: relative;
+  padding: 1px;
+  border-radius: 0.25rem;
+  background: linear-gradient(
+    270deg,
+    #d4d4d8 0%,
+    #ef4444 30%,
+    #d4d4d8 60%,
+    #ef4444 100%
+  );
+  background-size: 300% 100%;
+  animation: border-gradient-drift 4s ease-in-out infinite;
+}
+

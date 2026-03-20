@@ -78,6 +78,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect, 
     zkb: ZKBMetadata;
     systemName: string;
   }) {
+    const killTime = new Date(payload.killmail.killmail_time).getTime();
+    if (Date.now() - killTime > 20 * 60 * 1000) return;
+
     const event: WsKillEvent = {
       type: WsEventType.KILL_NEW,
       killmail: payload.killmail,

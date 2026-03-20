@@ -46,6 +46,7 @@ export class ZKBApi {
     }
 
     const json = await response.json();
+    if (!Array.isArray(json)) return [];
     return z.array(ZKBKillSchema).parse(json);
   }
 

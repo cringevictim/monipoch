@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type TimeWindow = '1h' | '6h' | '24h' | '7d';
+export type TimeWindow = '1h' | '6h' | '24h' | '3d' | '7d';
 
 interface MapState {
   timeWindow: TimeWindow;

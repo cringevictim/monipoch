@@ -59,6 +59,15 @@ export class AnalyticsController {
     return this.analyticsService.getTopLosses(days, limit, aid && !isNaN(aid) ? aid : undefined);
   }
 
+  @Get('hourly-activity')
+  async getHourlyActivity(
+    @Query('days', new DefaultValuePipe(1), ParseIntPipe) days: number,
+    @Query('allianceId') allianceId?: string,
+  ) {
+    const aid = allianceId ? parseInt(allianceId, 10) : undefined;
+    return this.analyticsService.getHourlyActivity(days, aid && !isNaN(aid) ? aid : undefined);
+  }
+
   @Get('fights')
   async getFights(
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,

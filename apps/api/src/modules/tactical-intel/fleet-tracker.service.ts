@@ -5,8 +5,8 @@ import { Cron } from '@nestjs/schedule';
 import { randomUUID } from 'crypto';
 import {
   POCHVEN_CONNECTIONS,
-  POCHVEN_SYSTEM_BY_ID,
-  POCHVEN_SYSTEM_IDS,
+  ALL_TRACKED_SYSTEM_BY_ID,
+  ALL_TRACKED_SYSTEM_IDS,
   type ESIKillmail,
   type ZKBMetadata,
 } from '@monipoch/shared';
@@ -82,7 +82,7 @@ export class FleetTrackerService implements OnModuleInit {
   }
 
   private async loadStargateIds(): Promise<void> {
-    const systemIds = Array.from(POCHVEN_SYSTEM_IDS);
+    const systemIds = Array.from(ALL_TRACKED_SYSTEM_IDS);
     this.logger.log(`Fetching stargates for ${systemIds.length} Pochven systems...`);
 
     const BATCH = 5;
@@ -150,7 +150,7 @@ export class FleetTrackerService implements OnModuleInit {
     const { killmail, zkb } = payload;
     const systemId = killmail.solar_system_id;
     const systemName =
-      POCHVEN_SYSTEM_BY_ID.get(systemId)?.name ?? `System ${systemId}`;
+      ALL_TRACKED_SYSTEM_BY_ID.get(systemId)?.name ?? `System ${systemId}`;
     const killTime = new Date(killmail.killmail_time).getTime();
 
     const attackerChars = this.extractAttackers(killmail);

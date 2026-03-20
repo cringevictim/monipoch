@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import type { Knex } from 'knex';
 import { KNEX_TOKEN } from '../../database/knex.provider';
-import { POCHVEN_SYSTEM_BY_ID } from '@monipoch/shared';
+import { ALL_TRACKED_SYSTEM_BY_ID } from '@monipoch/shared';
 
 export interface KillStatRow {
   date: string;
@@ -348,7 +348,7 @@ export class AnalyticsService {
       .limit(limit);
 
     return rows.map((r: any) => {
-      const sys = POCHVEN_SYSTEM_BY_ID.get(Number(r.systemId));
+      const sys = ALL_TRACKED_SYSTEM_BY_ID.get(Number(r.systemId));
       return {
         id: String(r.id),
         systemId: Number(r.systemId),
@@ -359,6 +359,51 @@ export class AnalyticsService {
         startedAt: r.startedAt
           ? new Date(r.startedAt).toISOString()
           : new Date().toISOString(),
+      };
+    });
+  }
+
+  async getHourlyActivity(
+    days = 1,
+    allianceId?: number,
+  ): Promise<{ hour: number; kills: number; isk: number }[]> {
+    const clampedDays = Math.max(1, Math.min(days, 7));
+    const since = new Date(Date.now() - clampedDays * 24 * 60 * 60 * 1000);
+
+    const query = this.db('killmails as km')
+      .select(this.db.raw('HOUR(km.killmail_time) as hour'))
+      .count('* as kills')
+      .sum('km.total_value as isk')
+      .where('km.killmail_time', '>=', since)
+      .where('km.is_npc', false);
+
+    if (allianceId) {
+      query.where(function () {
+        this.where('km.victim_alliance_id', allianceId).orWhereExists(function () {
+          this.select(1)
+            .from('killmail_attackers as ka')
+            .whereRaw('ka.killmail_id = km.killmail_id')
+            .where('ka.alliance_id', allianceId);
+        });
+      });
+    }
+
+    query.groupBy(this.db.raw('HOUR(km.killmail_time)'));
+
+    const rows: any[] = await query;
+    const byHour = new Map(
+      rows.map((r) => [
+        Number(r.hour),
+        { kills: Number(r.kills), isk: Number(r.isk || 0) },
+      ]),
+    );
+
+    return Array.from({ length: 24 }, (_, i) => {
+      const data = byHour.get(i) ?? { kills: 0, isk: 0 };
+      return {
+        hour: i,
+        kills: clampedDays > 1 ? Math.round((data.kills / clampedDays) * 10) / 10 : data.kills,
+        isk: clampedDays > 1 ? Math.round(data.isk / clampedDays) : data.isk,
       };
     });
   }
