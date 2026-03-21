@@ -10,7 +10,7 @@ import {
 import { Logger, OnModuleDestroy } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Server, WebSocket } from 'ws';
-import { WsEventType, type WsKillEvent, type WsFightEvent, type WsHeatmapUpdate, type WsNotificationEvent } from '@monipoch/shared';
+import { WsEventType, type WsKillEvent, type WsFightEvent, type WsHeatmapUpdate, type WsNotificationEvent, type WsPilotLocationsEvent, type PilotPresence } from '@monipoch/shared';
 import type { ESIKillmail, ZKBMetadata } from '@monipoch/shared';
 
 interface ExtendedSocket extends WebSocket {
@@ -127,6 +127,15 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect, 
 
   broadcastHeatmap(data: WsHeatmapUpdate) {
     this.broadcast(JSON.stringify(data));
+  }
+
+  @OnEvent('pilot.locations')
+  handlePilotLocations(payload: { pilots: PilotPresence[] }) {
+    const event: WsPilotLocationsEvent = {
+      type: WsEventType.PILOT_LOCATIONS,
+      pilots: payload.pilots,
+    };
+    this.broadcast(JSON.stringify(event));
   }
 
   private broadcast(message: string) {

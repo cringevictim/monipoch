@@ -199,6 +199,7 @@ export class DebugController {
         { id: 'fight-end', label: 'Fight Ended', description: 'Ends an active fight' },
         { id: 'camp', label: 'Gate Camp', description: 'Injects a gate camp fleet group into tactical intel' },
         { id: 'roam', label: 'Roaming Fleet', description: 'Injects a roaming fleet group into tactical intel' },
+        { id: 'pilots', label: 'Pilot Presence', description: 'Simulates alliance pilots in a system' },
         { id: 'notification', label: 'Notification', description: 'Broadcasts a notification event' },
       ],
     };
@@ -438,10 +439,37 @@ export class DebugController {
     return { ok: true, scenario: 'notification' };
   }
 
+  @Post('simulate/pilots')
+  simulatePilots(@Body() body: { systemId?: number; count?: number }) {
+    this.assertDebug();
+    const sys = pickSystem(body.systemId);
+    const count = Math.min(body.count ?? 3, 10);
+
+    const FLEET_ROLES: (undefined | 'fleet_commander' | 'wing_commander' | 'squad_commander' | 'squad_member')[] = [
+      'fleet_commander', 'wing_commander', 'squad_commander', 'squad_member', 'squad_member',
+      undefined, undefined, undefined, undefined, undefined,
+    ];
+
+    const pilots = Array.from({ length: count }, (_, i) => ({
+      characterId: 96491572 + i,
+      characterName: ['Debug Pilot', 'Test Capsuleer', 'Fleet Cmdr', 'Scout Alpha', 'Logi Bravo', 'DPS Charlie', 'Tackle Delta', 'Boosher Echo', 'Dictor Foxtrot', 'Sabre Golf'][i % 10],
+      shipTypeId: [587, 11393, 22456, 29984, 34562, 17812, 670, 24690, 17703, 621][i % 10],
+      shipTypeName: ['Rifter', 'Stiletto', 'Vagabond', 'Huginn', 'Loki', 'Claymore', 'Capsule', 'Drake', 'Tempest', 'Heron'][i % 10],
+      solarSystemId: sys.systemId,
+      online: true,
+      fleetId: FLEET_ROLES[i % 10] ? 1000000 : undefined,
+      fleetRole: FLEET_ROLES[i % 10],
+    }));
+
+    this.eventEmitter.emit('pilot.locations', { pilots });
+    return { ok: true, scenario: 'pilots', systemName: sys.name, count };
+  }
+
   @Post('simulate/clear')
   simulateClear() {
     this.assertDebug();
     (this.fleetTracker as any).groups.clear();
+    this.eventEmitter.emit('pilot.locations', { pilots: [] });
     return { ok: true, scenario: 'clear' };
   }
 }

@@ -24,7 +24,7 @@ const EnvSchema = z.object({
   CORS_ORIGIN: z.string().default(''),
   FRONTEND_URL: z.string().default(''),
 
-  DEBUG: z.coerce.boolean().default(false),
+  DEBUG: z.string().default('false').transform((v) => v === 'true' || v === '1'),
 });
 
 export type AppEnv = z.infer<typeof EnvSchema>;

@@ -12,6 +12,7 @@ export enum WsEventType {
   INTEL_REPORT = 'intel.report',
   WH_CONNECTION = 'wh.connection',
   NOTIFICATION = 'notification',
+  PILOT_LOCATIONS = 'pilot.locations',
 }
 
 export interface WsKillEvent {
@@ -64,10 +65,27 @@ export interface WsNotificationEvent {
   description: string;
 }
 
+export interface PilotPresence {
+  characterId: number;
+  characterName: string;
+  shipTypeId: number;
+  shipTypeName: string;
+  solarSystemId: number;
+  online: boolean;
+  fleetId?: number;
+  fleetRole?: 'fleet_commander' | 'wing_commander' | 'squad_commander' | 'squad_member';
+}
+
+export interface WsPilotLocationsEvent {
+  type: WsEventType.PILOT_LOCATIONS;
+  pilots: PilotPresence[];
+}
+
 export type WsEvent =
   | WsKillEvent
   | WsFightEvent
   | WsHeatmapUpdate
   | WsCampDetected
   | WsRoamTracked
-  | WsNotificationEvent;
+  | WsNotificationEvent
+  | WsPilotLocationsEvent;

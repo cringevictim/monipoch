@@ -99,9 +99,56 @@ export const KillmailDetailSchema = z.object({
   ),
 });
 
+export const CharacterLocationSchema = z.object({
+  solar_system_id: z.number(),
+  station_id: z.number().optional(),
+  structure_id: z.number().optional(),
+});
+
+export const CharacterOnlineSchema = z.object({
+  online: z.boolean(),
+  last_login: z.string().optional(),
+  last_logout: z.string().optional(),
+  logins: z.number().optional(),
+});
+
+export const CharacterShipSchema = z.object({
+  ship_item_id: z.number(),
+  ship_name: z.string(),
+  ship_type_id: z.number(),
+});
+
+export const CharacterFleetInfoSchema = z.object({
+  fleet_id: z.number(),
+  role: z.enum(['fleet_commander', 'wing_commander', 'squad_commander', 'squad_member']),
+  squad_id: z.number(),
+  wing_id: z.number(),
+});
+
+export const FleetMemberSchema = z.object({
+  character_id: z.number(),
+  join_time: z.string(),
+  role: z.enum(['fleet_commander', 'wing_commander', 'squad_commander', 'squad_member']),
+  role_name: z.string(),
+  ship_type_id: z.number(),
+  solar_system_id: z.number(),
+  squad_id: z.number(),
+  station_id: z.number().optional(),
+  takes_fleet_warp: z.boolean(),
+  wing_id: z.number(),
+});
+
+export const FleetMembersSchema = z.array(FleetMemberSchema);
+
 export type CharacterPublic = z.infer<typeof CharacterPublicSchema>;
 export type CorporationPublic = z.infer<typeof CorporationPublicSchema>;
 export type AlliancePublic = z.infer<typeof AlliancePublicSchema>;
 export type CharacterAffiliation = z.infer<typeof CharacterAffiliationSchema>;
 export type SystemKills = z.infer<typeof SystemKillsSchema>;
 export type KillmailDetail = z.infer<typeof KillmailDetailSchema>;
+export type CharacterLocation = z.infer<typeof CharacterLocationSchema>;
+export type CharacterOnline = z.infer<typeof CharacterOnlineSchema>;
+export type CharacterShip = z.infer<typeof CharacterShipSchema>;
+export type CharacterFleetInfo = z.infer<typeof CharacterFleetInfoSchema>;
+export type FleetMember = z.infer<typeof FleetMemberSchema>;
+export type FleetMembers = z.infer<typeof FleetMembersSchema>;

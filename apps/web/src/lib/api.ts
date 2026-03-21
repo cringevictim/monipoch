@@ -9,7 +9,7 @@ export function apiFetch(url: string, init?: RequestInit): Promise<Response> {
   return fetch(url, { ...init, headers }).then((response) => {
     if (response.status === 401) {
       useAuthStore.getState().logout();
-      window.location.href = '/login';
+      window.location.href = '/login?error=scopes';
     }
     return response;
   });

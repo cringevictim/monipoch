@@ -35,9 +35,9 @@ export const KillmailVictimSchema = z.object({
   items: z.array(z.any()).optional(),
   position: z
     .object({
-      x: z.number(),
-      y: z.number(),
-      z: z.number(),
+      x: z.number().optional(),
+      y: z.number().optional(),
+      z: z.number().optional(),
     })
     .optional(),
 }).passthrough();

@@ -1,12 +1,13 @@
 import { forwardRef, useMemo, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { PochvenSystem, DetectedFight } from '@monipoch/shared';
+import type { PochvenSystem, DetectedFight, PilotPresence } from '@monipoch/shared';
 import { Constellation } from '@monipoch/shared';
 import SystemNode from './SystemNode';
 import ConnectionLine from './ConnectionLine';
 import FightIndicator from './FightIndicator';
 import CampIndicator, { type GateCampData } from './CampIndicator';
 import RoamIndicator, { type RoamingFleetData } from './RoamIndicator';
+import PilotPresenceIndicator from './PilotPresenceIndicator';
 import { computeLayout, V } from './layout';
 import { useMapStore, type TimeWindow } from '../../stores/map';
 import { useCollisionEngine, type LabelDescriptor, type StaticObstacle } from '../../hooks/useCollisionEngine';
@@ -18,7 +19,10 @@ interface Props {
   activeFights: DetectedFight[];
   activeCamps: GateCampData[];
   activeRoams: RoamingFleetData[];
+  pilotPresence: PilotPresence[];
   timeWindow: TimeWindow;
+  onPilotHover?: (pilot: PilotPresence, svgX: number, svgY: number) => void;
+  onPilotLeave?: () => void;
 }
 
 const CONSTELLATION_COLORS: Record<Constellation, string> = {
@@ -63,8 +67,10 @@ function outwardOffset(nodeX: number, nodeY: number) {
   return { ox: (dx / len) * LABEL_DISTANCE, oy: (dy / len) * LABEL_DISTANCE };
 }
 
+const EMPTY_PILOTS: PilotPresence[] = [];
+
 const PochvenMap = forwardRef<SVGSVGElement, Props>(function PochvenMap(
-  { systems, connections, heatmap, activeFights, activeCamps, activeRoams, timeWindow },
+  { systems, connections, heatmap, activeFights, activeCamps, activeRoams, pilotPresence, timeWindow, onPilotHover, onPilotLeave },
   ref,
 ) {
   const positions = useMemo(() => computeLayout(systems), [systems]);
@@ -198,6 +204,16 @@ const PochvenMap = forwardRef<SVGSVGElement, Props>(function PochvenMap(
     collisionRaf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(collisionRaf.current);
   }, [allLabels, resolve]);
+
+  const systemPilotMap = useMemo(() => {
+    const map = new Map<number, PilotPresence[]>();
+    for (const p of pilotPresence) {
+      const list = map.get(p.solarSystemId);
+      if (list) list.push(p);
+      else map.set(p.solarSystemId, [p]);
+    }
+    return map;
+  }, [pilotPresence]);
 
   function getKillCount(systemId: number): number {
     const data = heatmap[systemId];
@@ -380,6 +396,23 @@ const PochvenMap = forwardRef<SVGSVGElement, Props>(function PochvenMap(
             y={pos.y}
             kills={getKillCount(sys.systemId)}
             hasFight={fightSystems.has(sys.systemId)}
+          />
+        );
+      })}
+
+      {/* Pilot presence indicators — always rendered so ghosts can fade out */}
+      {systems.map((sys) => {
+        const pos = positions.get(sys.name);
+        if (!pos) return null;
+        return (
+          <PilotPresenceIndicator
+            key={`presence-${sys.systemId}`}
+            pilots={systemPilotMap.get(sys.systemId) ?? EMPTY_PILOTS}
+            x={pos.x}
+            y={pos.y}
+            nodeRadius={getNodeRadius(getKillCount(sys.systemId), sys.systemType)}
+            onPilotHover={onPilotHover}
+            onPilotLeave={onPilotLeave}
           />
         );
       })}

@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
-import { AuthService } from './auth.service';
+import { AuthService, REQUIRED_ESI_SCOPES } from './auth.service';
 import { Public } from './public.decorator';
 import { randomBytes } from 'crypto';
 import type { SessionUser } from '@monipoch/shared';
@@ -52,7 +52,7 @@ export class AuthController {
         allianceName: 'Debug Alliance',
         portraitUrl: 'https://images.evetech.net/characters/96491572/portrait?size=128',
       },
-      scopes: [],
+      scopes: [...REQUIRED_ESI_SCOPES],
     };
 
     const token = this.jwtService.sign(payload);
@@ -91,6 +91,13 @@ export class AuthController {
         `${frontendUrl}/auth/success?token=${encodeURIComponent(token)}&name=${encodeURIComponent(character.characterName)}`,
       );
     } catch (err: any) {
+      const frontendUrl =
+        this.config.get<string>('frontendUrl') ||
+        (this.config.get<string>('nodeEnv') === 'production' ? '/' : 'http://localhost:5173');
+
+      if (err?.message === 'SCOPES_MISSING') {
+        return res.redirect(`${frontendUrl}/login?error=scopes`);
+      }
       if (err?.message === 'ALLIANCE_DENIED') {
         return res.redirect('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
       }

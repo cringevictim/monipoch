@@ -3,13 +3,23 @@ import {
   AlliancePublicSchema,
   CharacterAffiliationSchema,
   CharacterPublicSchema,
+  CharacterFleetInfoSchema,
+  CharacterLocationSchema,
+  CharacterOnlineSchema,
+  CharacterShipSchema,
   CorporationPublicSchema,
+  FleetMembersSchema,
   KillmailDetailSchema,
   SystemKillsSchema,
   type AlliancePublic,
   type CharacterAffiliation,
+  type CharacterFleetInfo,
+  type CharacterLocation,
+  type CharacterOnline,
   type CharacterPublic,
+  type CharacterShip,
   type CorporationPublic,
+  type FleetMembers,
   type KillmailDetail,
   type SystemKills,
 } from './schemas';
@@ -80,6 +90,61 @@ export class ESIEndpoints {
     return this.client.get(
       `/killmails/${killmailId}/${killmailHash}/`,
       KillmailDetailSchema,
+      opts,
+    );
+  }
+
+  getCharacterLocation(
+    characterId: number,
+    opts?: ESIRequestOptions,
+  ): Promise<ESIResponse<CharacterLocation>> {
+    return this.client.get(
+      `/characters/${characterId}/location/`,
+      CharacterLocationSchema,
+      opts,
+    );
+  }
+
+  getCharacterOnline(
+    characterId: number,
+    opts?: ESIRequestOptions,
+  ): Promise<ESIResponse<CharacterOnline>> {
+    return this.client.get(
+      `/characters/${characterId}/online/`,
+      CharacterOnlineSchema,
+      opts,
+    );
+  }
+
+  getCharacterShip(
+    characterId: number,
+    opts?: ESIRequestOptions,
+  ): Promise<ESIResponse<CharacterShip>> {
+    return this.client.get(
+      `/characters/${characterId}/ship/`,
+      CharacterShipSchema,
+      opts,
+    );
+  }
+
+  getCharacterFleet(
+    characterId: number,
+    opts?: ESIRequestOptions,
+  ): Promise<ESIResponse<CharacterFleetInfo>> {
+    return this.client.get(
+      `/characters/${characterId}/fleet/`,
+      CharacterFleetInfoSchema,
+      opts,
+    );
+  }
+
+  getFleetMembers(
+    fleetId: number,
+    opts?: ESIRequestOptions,
+  ): Promise<ESIResponse<FleetMembers>> {
+    return this.client.get(
+      `/fleets/${fleetId}/members/`,
+      FleetMembersSchema,
       opts,
     );
   }

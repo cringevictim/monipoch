@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import type { SessionUser } from '@monipoch/shared';
 import { IS_PUBLIC_KEY } from './public.decorator';
+import { REQUIRED_ESI_SCOPES } from './auth.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -31,9 +32,16 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const payload = await this.jwtService.verifyAsync<SessionUser>(token);
+
+      const userScopes = new Set(payload.scopes ?? []);
+      if (REQUIRED_ESI_SCOPES.some((s) => !userScopes.has(s))) {
+        throw new UnauthorizedException('Outdated ESI scopes — please log in again');
+      }
+
       (request as any).user = payload;
       return true;
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
       throw new UnauthorizedException('Invalid or expired token');
     }
   }

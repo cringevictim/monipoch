@@ -18,6 +18,7 @@ import { PVEIntelModule } from './modules/pve-intel/pve-intel.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { PochvenToolsModule } from './modules/pochven-tools/pochven-tools.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { LocationTrackerModule } from './modules/location-tracker/location-tracker.module';
 import { MapController } from './modules/map/map.controller';
 import { MapService } from './modules/map/map.service';
 import { DebugController } from './modules/debug/debug.controller';
@@ -50,6 +51,7 @@ import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
     NotificationModule,
     PochvenToolsModule,
     AnalyticsModule,
+    LocationTrackerModule,
   ],
   controllers: [MapController, DebugController, HealthController],
   providers: [

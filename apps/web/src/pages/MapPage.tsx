@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { PochvenSystem, DetectedFight, WsKillEvent } from '@monipoch/shared';
+import type { PochvenSystem, DetectedFight, WsKillEvent, PilotPresence, WsPilotLocationsEvent } from '@monipoch/shared';
 import { POCHVEN_SYSTEMS, EXTRA_TRACKED_SYSTEMS } from '@monipoch/shared';
 import { apiJson } from '../lib/api';
 import {
@@ -29,6 +29,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../com
 import NotificationPanel from '../components/panels/NotificationPanel';
 import AnalyticsPanel from '../components/panels/AnalyticsPanel';
 import DebugPanel from '../components/panels/DebugPanel';
+import { PILOT_ROLE_LABELS, PILOT_ROLE_COLORS } from '../components/map/PilotPresenceIndicator';
 
 const TIME_WINDOWS: { label: string; value: TimeWindow }[] = [
   { label: '1H', value: '1h' },
@@ -68,6 +69,13 @@ export default function MapPage() {
 
     if (lastEvent.type === 'fight.started' || lastEvent.type === 'fight.updated' || lastEvent.type === 'fight.ended') {
       queryClient.invalidateQueries({ queryKey: ['fights-active'] });
+    }
+
+    if (lastEvent.type === 'pilot.locations') {
+      queryClient.setQueryData<PilotPresence[]>(
+        ['pilot-locations'],
+        (lastEvent as WsPilotLocationsEvent).pilots,
+      );
     }
 
     if (lastEvent.type === 'kill.new') {
@@ -172,6 +180,12 @@ export default function MapPage() {
     refetchInterval: 15_000,
   });
 
+  const { data: pilotPresence } = useQuery({
+    queryKey: ['pilot-locations'],
+    queryFn: () => apiJson<PilotPresence[]>('/api/map/pilots'),
+    refetchInterval: 20_000,
+  });
+
   const activeCamps = useMemo<GateCampData[]>(
     () => (activeGroups ?? []).filter((g): g is GateCampData => g.type === 'camp'),
     [activeGroups],
@@ -201,6 +215,58 @@ export default function MapPage() {
       return positions.get(sys.name) ?? null;
     }
   }, [selectedTacticalId, activeCamps, activeRoams, positions]);
+
+  // Pilot tooltip
+  const [hoveredPilot, setHoveredPilot] = useState<{ pilot: PilotPresence; screenX: number; screenY: number } | null>(null);
+  const pilotTooltipBorderRef = useRef<HTMLDivElement>(null);
+  const pilotTooltipRafRef = useRef(0);
+
+  useEffect(() => {
+    if (!hoveredPilot) {
+      cancelAnimationFrame(pilotTooltipRafRef.current);
+      return;
+    }
+    const p1 = Math.random() * Math.PI * 2;
+    const p2 = Math.random() * Math.PI * 2;
+    function tick() {
+      const t = Date.now() * 0.0008;
+      const deg = Math.sin(t + p1) * 180 + Math.cos(t * 0.6 + p2) * 90;
+      if (pilotTooltipBorderRef.current) {
+        pilotTooltipBorderRef.current.style.background = `linear-gradient(${deg}deg, rgba(212,212,216,0.55), rgba(239,68,68,0.25))`;
+      }
+      pilotTooltipRafRef.current = requestAnimationFrame(tick);
+    }
+    pilotTooltipRafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(pilotTooltipRafRef.current);
+  }, [hoveredPilot]);
+
+  const handlePilotHover = useCallback((pilot: PilotPresence, svgX: number, svgY: number) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const viewBoxW = 1000;
+    const viewBoxH = 750;
+    const svgAspect = viewBoxW / viewBoxH;
+    const rectAspect = rect.width / rect.height;
+    let renderW: number, renderH: number, renderX: number, renderY: number;
+    if (rectAspect > svgAspect) {
+      renderH = rect.height;
+      renderW = renderH * svgAspect;
+      renderX = rect.left + (rect.width - renderW) / 2;
+      renderY = rect.top;
+    } else {
+      renderW = rect.width;
+      renderH = renderW / svgAspect;
+      renderX = rect.left;
+      renderY = rect.top + (rect.height - renderH) / 2;
+    }
+    setHoveredPilot({
+      pilot,
+      screenX: renderX + (svgX / viewBoxW) * renderW,
+      screenY: renderY + (svgY / viewBoxH) * renderH,
+    });
+  }, []);
+
+  const handlePilotLeave = useCallback(() => setHoveredPilot(null), []);
 
   function getKillCount(systemId: number): number {
     const data = heatmap?.[systemId];
@@ -377,7 +443,10 @@ export default function MapPage() {
                 activeFights={activeFights ?? []}
                 activeCamps={activeCamps}
                 activeRoams={activeRoams}
+                pilotPresence={pilotPresence ?? []}
                 timeWindow={timeWindow}
+                onPilotHover={handlePilotHover}
+                onPilotLeave={handlePilotLeave}
               />
             )}
             <KillTicker />
@@ -407,6 +476,67 @@ export default function MapPage() {
                   svgRect={svgRect}
                 />
               )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {hoveredPilot && (() => {
+                const { pilot, screenX, screenY } = hoveredPilot;
+                const shipUrl = pilot.shipTypeId
+                  ? `https://images.evetech.net/types/${pilot.shipTypeId}/render?size=64`
+                  : null;
+                const role = pilot.fleetRole ? PILOT_ROLE_LABELS[pilot.fleetRole] : null;
+                const roleClr = pilot.fleetRole ? (PILOT_ROLE_COLORS[pilot.fleetRole] ?? '#4ade80') : null;
+                const W = 210;
+                let left = screenX - W / 2;
+                if (left < 8) left = 8;
+                if (left + W > window.innerWidth - 8) left = window.innerWidth - W - 8;
+
+                return (
+                  <motion.div
+                    key={`pilot-tt-${pilot.characterId}`}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className="fixed z-[200] pointer-events-none"
+                    style={{ left, top: screenY - 14, width: W, transform: 'translateY(-100%)' }}
+                  >
+                    <div className="relative rounded-lg" style={{ padding: '1.5px' }}>
+                      <div ref={pilotTooltipBorderRef} className="absolute inset-0 rounded-lg" />
+                      <div className="relative rounded-lg overflow-hidden bg-pochven-surface/95 backdrop-blur-xl shadow-2xl flex items-center gap-2 px-2.5 py-2">
+                        {shipUrl && (
+                          <img src={shipUrl} alt="" className="w-8 h-8 rounded bg-black/30 flex-shrink-0" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-medium text-gray-200 truncate leading-tight">
+                              {pilot.characterName}
+                            </span>
+                            {role && (
+                              <span className="text-[11px] font-bold flex-shrink-0" style={{ color: roleClr! }}>
+                                [{role}]
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate leading-tight mt-0.5">
+                            {pilot.shipTypeName || 'Unknown Ship'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="absolute left-1/2 -translate-x-1/2 -bottom-[4px]">
+                        <div
+                          className="w-0 h-0"
+                          style={{
+                            borderLeft: '4px solid transparent',
+                            borderRight: '4px solid transparent',
+                            borderTop: '4px solid rgba(22, 16, 16, 0.95)',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })()}
             </AnimatePresence>
           </main>
           <div className="fixed bottom-2 right-3 z-20 text-[11px] text-gray-500/60 select-none pointer-events-auto">

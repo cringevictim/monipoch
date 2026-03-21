@@ -53,17 +53,23 @@ let logIdCounter = 0;
 export default function DebugPanel() {
   const [open, setOpen] = useState(false);
   const [selectedSystem, setSelectedSystem] = useState<number | undefined>(undefined);
+  const [pilotCount, setPilotCount] = useState(3);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [firing, setFiring] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const fire = useCallback(async (scenarioId: string) => {
     setFiring(scenarioId);
+    const endpoint = scenarioId === 'clear-pilots' ? 'clear' : scenarioId;
     try {
-      const resp = await apiFetch(`/api/debug/simulate/${scenarioId}`, {
+      const payload: Record<string, unknown> = {};
+      if (selectedSystem) payload.systemId = selectedSystem;
+      if (scenarioId === 'pilots') payload.count = pilotCount;
+
+      const resp = await apiFetch(`/api/debug/simulate/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selectedSystem ? { systemId: selectedSystem } : {}),
+        body: JSON.stringify(payload),
       });
       const data = await resp.json();
       const entry: LogEntry = {
@@ -85,7 +91,7 @@ export default function DebugPanel() {
     } finally {
       setFiring(null);
     }
-  }, [selectedSystem]);
+  }, [selectedSystem, pilotCount]);
 
   return (
     <>
@@ -172,6 +178,57 @@ export default function DebugPanel() {
                   </div>
                 );
               })}
+
+              {/* Pilot Presence */}
+              <div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-wider font-medium mb-1.5">
+                  Pilot Presence
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <button
+                    onClick={() => setPilotCount((c) => Math.max(1, c - 1))}
+                    className="w-7 h-7 rounded-md border border-pochven-border bg-pochven-bg/80 text-gray-300 hover:bg-white/10 flex items-center justify-center text-sm font-bold"
+                  >
+                    −
+                  </button>
+                  <span className="text-sm text-gray-200 font-medium tabular-nums w-6 text-center">{pilotCount}</span>
+                  <button
+                    onClick={() => setPilotCount((c) => Math.min(10, c + 1))}
+                    className="w-7 h-7 rounded-md border border-pochven-border bg-pochven-bg/80 text-gray-300 hover:bg-white/10 flex items-center justify-center text-sm font-bold"
+                  >
+                    +
+                  </button>
+                  <span className="text-[11px] text-gray-500 flex-1">pilot{pilotCount !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => fire(`pilots`)}
+                    disabled={firing !== null}
+                    className="relative px-2.5 py-2 rounded-lg border text-left transition-all duration-100 hover:brightness-125 disabled:opacity-50 bg-green-500/20 text-green-400 border-green-500/30"
+                  >
+                    <div className="text-xs font-medium leading-tight">Spawn Pilots</div>
+                    <div className="text-[9px] opacity-60 mt-0.5 leading-tight">All fleet roles</div>
+                    {firing === 'pilots' && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => fire('clear-pilots')}
+                    disabled={firing !== null}
+                    className="relative px-2.5 py-2 rounded-lg border text-left transition-all duration-100 hover:brightness-125 disabled:opacity-50 bg-gray-500/20 text-gray-400 border-gray-500/30"
+                  >
+                    <div className="text-xs font-medium leading-tight">Clear Pilots</div>
+                    <div className="text-[9px] opacity-60 mt-0.5 leading-tight">Remove all</div>
+                    {firing === 'clear-pilots' && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </button>
+                </div>
+              </div>
 
               {/* Log */}
               {logs.length > 0 && (

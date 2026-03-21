@@ -8,6 +8,17 @@ function Swatch({ color }: { color: string }) {
   );
 }
 
+function PilotSwatch({ color, crown }: { color: string; crown?: boolean }) {
+  return (
+    <span className="inline-flex items-center justify-center w-5 h-5 flex-shrink-0 relative">
+      <span className="w-4 h-4 rounded-full border-[1.5px]" style={{ borderColor: color, background: '#111' }} />
+      {crown && (
+        <span className="absolute -top-[2px] left-1/2 -translate-x-1/2 text-[7px] leading-none" style={{ color }}>&#9650;</span>
+      )}
+    </span>
+  );
+}
+
 function RingSwatch({ color, dashed, pulse }: { color: string; dashed?: boolean; pulse?: boolean }) {
   return (
     <span className="inline-flex items-center justify-center w-5 h-5 flex-shrink-0">
@@ -107,6 +118,36 @@ export default function MapLegend() {
                     <span className="px-1 py-0 text-[9px] font-semibold rounded border border-red-500/30 bg-black/40 text-red-400 leading-tight">CAMP</span>
                   </span>
                   <span className="text-gray-300">Drifting label — click to open details</span>
+                </Row>
+              </div>
+            </Section>
+
+            {/* Pilot Presence */}
+            <Section title="Alliance Members" desc="Live ESI location tracking of logged-in pilots">
+              <div className="space-y-1">
+                <Row>
+                  <PilotSwatch color="#f59e0b" crown />
+                  <span className="text-gray-300">Fleet Commander</span>
+                </Row>
+                <Row>
+                  <PilotSwatch color="#3b82f6" />
+                  <span className="text-gray-300">Wing Commander</span>
+                </Row>
+                <Row>
+                  <PilotSwatch color="#8b5cf6" />
+                  <span className="text-gray-300">Squad Commander</span>
+                </Row>
+                <Row>
+                  <PilotSwatch color="#6b7280" />
+                  <span className="text-gray-300">Squad Member</span>
+                </Row>
+                <Row>
+                  <PilotSwatch color="#4ade80" />
+                  <span className="text-gray-300">Not in fleet</span>
+                </Row>
+                <Row>
+                  <RingSwatch color="#4ade80" dashed />
+                  <span className="text-gray-300">System has alliance pilots present</span>
                 </Row>
               </div>
             </Section>

@@ -246,24 +246,38 @@ export class HostileProfileService {
           last_updated: new Date(),
         });
     } else {
-      await this.db('hostile_profiles').insert({
-        entity_type: entityType,
-        entity_id: entityId,
-        entity_name: entityName,
-        total_kills: newTotalKills,
-        total_losses: 0,
-        total_isk_destroyed: newTotalIskDestroyed,
-        total_isk_lost: 0,
-        threat_score: 0,
-        preferred_ship_types: JSON.stringify(preferredShipTypes),
-        activity_by_hour: JSON.stringify(activityByHour),
-        preferred_systems: JSON.stringify(preferredSystems),
-        avg_fleet_size: Math.round(newAvgFleetSize * 100) / 100,
-        first_seen: killTime,
-        last_seen: killTime,
-        last_seen_system: systemName,
-        last_updated: new Date(),
-      });
+      await this.db('hostile_profiles')
+        .insert({
+          entity_type: entityType,
+          entity_id: entityId,
+          entity_name: entityName,
+          total_kills: newTotalKills,
+          total_losses: 0,
+          total_isk_destroyed: newTotalIskDestroyed,
+          total_isk_lost: 0,
+          threat_score: 0,
+          preferred_ship_types: JSON.stringify(preferredShipTypes),
+          activity_by_hour: JSON.stringify(activityByHour),
+          preferred_systems: JSON.stringify(preferredSystems),
+          avg_fleet_size: Math.round(newAvgFleetSize * 100) / 100,
+          first_seen: killTime,
+          last_seen: killTime,
+          last_seen_system: systemName,
+          last_updated: new Date(),
+        })
+        .onConflict(['entity_type', 'entity_id'])
+        .merge({
+          entity_name: entityName,
+          total_kills: newTotalKills,
+          total_isk_destroyed: newTotalIskDestroyed,
+          preferred_ship_types: JSON.stringify(preferredShipTypes),
+          activity_by_hour: JSON.stringify(activityByHour),
+          preferred_systems: JSON.stringify(preferredSystems),
+          avg_fleet_size: Math.round(newAvgFleetSize * 100) / 100,
+          last_seen: killTime,
+          last_seen_system: systemName,
+          last_updated: new Date(),
+        });
     }
   }
 
@@ -296,24 +310,34 @@ export class HostileProfileService {
           last_updated: new Date(),
         });
     } else {
-      await this.db('hostile_profiles').insert({
-        entity_type: entityType,
-        entity_id: entityId,
-        entity_name: entityName,
-        total_kills: 0,
-        total_losses: newTotalLosses,
-        total_isk_destroyed: 0,
-        total_isk_lost: newTotalIskLost,
-        threat_score: 0,
-        preferred_ship_types: null,
-        activity_by_hour: null,
-        preferred_systems: JSON.stringify({ [systemName]: 1 }),
-        avg_fleet_size: null,
-        first_seen: killTime,
-        last_seen: killTime,
-        last_seen_system: systemName,
-        last_updated: new Date(),
-      });
+      await this.db('hostile_profiles')
+        .insert({
+          entity_type: entityType,
+          entity_id: entityId,
+          entity_name: entityName,
+          total_kills: 0,
+          total_losses: newTotalLosses,
+          total_isk_destroyed: 0,
+          total_isk_lost: newTotalIskLost,
+          threat_score: 0,
+          preferred_ship_types: null,
+          activity_by_hour: null,
+          preferred_systems: JSON.stringify({ [systemName]: 1 }),
+          avg_fleet_size: null,
+          first_seen: killTime,
+          last_seen: killTime,
+          last_seen_system: systemName,
+          last_updated: new Date(),
+        })
+        .onConflict(['entity_type', 'entity_id'])
+        .merge({
+          entity_name: entityName,
+          total_losses: newTotalLosses,
+          total_isk_lost: newTotalIskLost,
+          last_seen: killTime,
+          last_seen_system: systemName,
+          last_updated: new Date(),
+        });
     }
   }
 

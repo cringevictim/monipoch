@@ -1,9 +1,18 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Knex } from 'knex';
 import { KNEX_TOKEN } from '../../database/knex.provider';
 import type { SessionUser, EveCharacter } from '@monipoch/shared';
+
+export const REQUIRED_ESI_SCOPES = [
+  'esi-location.read_location.v1',
+  'esi-location.read_online.v1',
+  'esi-location.read_ship_type.v1',
+  'esi-fleets.read_fleet.v1',
+];
+const ESI_SCOPES = REQUIRED_ESI_SCOPES.join(' ');
 
 interface SSOTokenResponse {
   access_token: string;
@@ -18,8 +27,15 @@ interface SSOVerifyResponse {
   Scopes: string;
 }
 
+export interface TokenSet {
+  accessToken: string;
+  expiresAt: number;
+  characterId: number;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private clientId: string;
   private clientSecret: string;
   private callbackUrl: string;
@@ -28,6 +44,7 @@ export class AuthService {
   constructor(
     private config: ConfigService,
     private jwtService: JwtService,
+    private eventEmitter: EventEmitter2,
     @Inject(KNEX_TOKEN) private db: Knex,
   ) {
     this.clientId = this.config.getOrThrow('eve.clientId');
@@ -42,7 +59,7 @@ export class AuthService {
       redirect_uri: this.callbackUrl,
       client_id: this.clientId,
       state,
-      scope: '',
+      scope: ESI_SCOPES,
     });
     return `https://login.eveonline.com/v2/oauth/authorize/?${params}`;
   }
@@ -53,6 +70,13 @@ export class AuthService {
 
     const characterId = ssoVerify.CharacterID;
     const characterName = ssoVerify.CharacterName;
+
+    const grantedScopes = new Set(ssoVerify.Scopes ? ssoVerify.Scopes.split(' ') : []);
+    const missingScopes = REQUIRED_ESI_SCOPES.filter((s) => !grantedScopes.has(s));
+    if (missingScopes.length > 0) {
+      this.logger.warn(`Login rejected for ${characterName} — missing scopes: ${missingScopes.join(', ')}`);
+      throw new UnauthorizedException('SCOPES_MISSING');
+    }
 
     const charInfo = await this.fetchESI(`/characters/${characterId}/`);
     const corporationId = charInfo.corporation_id;
@@ -69,7 +93,7 @@ export class AuthService {
     await this.upsertAlliance(allianceId, allianceInfo.name, allianceInfo.ticker);
     await this.upsertCorporation(corporationId, corpInfo.name, corpInfo.ticker, allianceId);
     await this.upsertCharacter(characterId, characterName, corporationId, allianceId);
-    const userId = await this.upsertUser(characterId, ssoTokens.refresh_token, ssoVerify.Scopes);
+    const userId = await this.upsertUser(characterId, ssoTokens, ssoVerify.Scopes);
 
     const character: EveCharacter = {
       characterId,
@@ -88,6 +112,9 @@ export class AuthService {
     };
 
     const token = this.jwtService.sign(payload);
+
+    this.eventEmitter.emit('auth.login', { characterId, characterName });
+
     return { token, character };
   }
 
@@ -172,17 +199,78 @@ export class AuthService {
       .merge();
   }
 
-  private async upsertUser(characterId: number, refreshToken: string, scopes: string): Promise<number> {
+  async refreshAccessToken(characterId: number): Promise<TokenSet | null> {
+    const user = await this.db('users').where('character_id', characterId).first();
+    if (!user?.refresh_token) return null;
+
+    const cachedExpiry = user.access_token_expires_at ? new Date(user.access_token_expires_at).getTime() : 0;
+    if (user.access_token && cachedExpiry > Date.now() + 60_000) {
+      return { accessToken: user.access_token, expiresAt: cachedExpiry, characterId };
+    }
+
+    try {
+      const credentials = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
+      const response = await fetch('https://login.eveonline.com/v2/oauth/token', {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${credentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: user.refresh_token,
+        }),
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Token refresh failed for character ${characterId}: ${response.status}`);
+        return null;
+      }
+
+      const data: SSOTokenResponse = await response.json();
+      const expiresAt = Date.now() + data.expires_in * 1000;
+
+      await this.db('users').where('character_id', characterId).update({
+        access_token: data.access_token,
+        access_token_expires_at: new Date(expiresAt),
+        refresh_token: data.refresh_token,
+      });
+
+      return { accessToken: data.access_token, expiresAt, characterId };
+    } catch (err) {
+      this.logger.error(`Token refresh error for character ${characterId}`, err);
+      return null;
+    }
+  }
+
+  async getTrackableUsers(): Promise<{ characterId: number; characterName: string }[]> {
+    return this.db('users')
+      .join('characters', 'users.character_id', 'characters.character_id')
+      .whereNotNull('users.refresh_token')
+      .where('users.scopes', 'like', '%esi-location.read_location%')
+      .select('characters.character_id as characterId', 'characters.name as characterName');
+  }
+
+  private async upsertUser(characterId: number, ssoTokens: SSOTokenResponse, scopes: string): Promise<number> {
+    const expiresAt = new Date(Date.now() + ssoTokens.expires_in * 1000);
     const existing = await this.db('users').where('character_id', characterId).first();
     if (existing) {
       await this.db('users')
         .where('id', existing.id)
-        .update({ refresh_token: refreshToken, scopes, last_login: this.db.fn.now() });
+        .update({
+          refresh_token: ssoTokens.refresh_token,
+          access_token: ssoTokens.access_token,
+          access_token_expires_at: expiresAt,
+          scopes,
+          last_login: this.db.fn.now(),
+        });
       return existing.id;
     }
     const [id] = await this.db('users').insert({
       character_id: characterId,
-      refresh_token: refreshToken,
+      refresh_token: ssoTokens.refresh_token,
+      access_token: ssoTokens.access_token,
+      access_token_expires_at: expiresAt,
       scopes,
     });
     return id;
